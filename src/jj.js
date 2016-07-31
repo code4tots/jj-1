@@ -695,9 +695,7 @@ class CodeGenerator {
     return this._inverseDebugInfo[message];
   }
   translateModule(node) {
-    let str = node.stmts.map(stmt => this.translateStatement(stmt))
-              .map(stmt => stmt.replace(/\n/g, "\n  "))
-              .join("");
+    let str = node.stmts.map(stmt => this.translateStatement(stmt)).join("");
     return str;
   }
   translateStatement(node) {
@@ -711,6 +709,9 @@ class CodeGenerator {
       let stmts = node.stmts.map(stmt => this.translateStatement(stmt));
       stmts = stmts.map(stmt => stmt.replace(/\n/g, "\n  "));
       return "\n{" + stmts.join("") + "\n}";
+    }
+    case "Return": {
+      return "\nreturn " + this.translateOuterExpression(node.expr) + ";";
     }
     default:
       throw new TranspileError(
@@ -816,7 +817,7 @@ class CodeGenerator {
   }
 }
 
-const builtinPrelude = `
+const nativePrelude = `
 
 //// Runtime support
 
@@ -1029,6 +1030,24 @@ function jjlen(stack, xs) {
 
 `;
 
+// Builtin prelude can't just be a separate jj file because
+// every 'jj' file always belongs to its own module, and we
+// use those modules by importing them, and qualifying every name
+// with that name.
+// However, builtins are supposed to be names that are available in
+// every module. That's why it is transpiled and inejected separately.
+const builtinPrelude = `
+
+def print(x) {
+  #console#log(x);
+}
+
+def getStackTraceMessage() {
+  return #getStackTraceMessageFromStack(#stack);
+}
+
+`;
+
 function transpileProgram(uriTextPairs) {
   const packageTable = Object.create(null);  // package-name => uri
   const uriTable = Object.create(null);  // uri => code
@@ -1050,6 +1069,8 @@ function transpileProgram(uriTextPairs) {
   let uriTableStr = "";
   let packageTableStr = "";
   const cg = new CodeGenerator();
+  const transpiledBuiltinPrelude = cg.translateModule(
+      parseModule("<prelude>", builtinPrelude));
   for (const [uri, text] of uriTextPairs) {
     let code = null;
     if (uri.endsWith(".js")) {
@@ -1068,7 +1089,7 @@ function transpileProgram(uriTextPairs) {
       }
     } else {
       const mod = parseModule(uri, text);
-      code = cg.translateModule(mod);
+      code = cg.translateModule(mod).replace(/\n/g, "\n  ");
       addUri(uri, code);
       for (const pkg of mod.packages) {
         addPackage(pkg, uri);
@@ -1081,11 +1102,12 @@ function transpileProgram(uriTextPairs) {
          "\n// jshint esversion: 6" +
          "\n(function() {" +
          "\n\"use strict\";" +
-         builtinPrelude +
+         nativePrelude +
          "\nconst moduleCache = Object.create(null);" +
          "\nconst debugInfo = " + JSON.stringify(cg.getDebugInfo()) + ";" +
          "\nconst packageTable = Object.create(null);" + packageTableStr +
          "\nconst uriTable = Object.create(null);" + uriTableStr +
+         transpiledBuiltinPrelude +
          "\ntryAndCatch(stack => importUri(stack, " +
              JSON.stringify(startUri) + "));" +
          "\n})();";
