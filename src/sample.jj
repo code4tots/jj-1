@@ -5,14 +5,20 @@ def print(x) {
 print("Hello world!");
 print(len([1, 2, 3]));
 
-async def asyncFunc() {
+def syncFunc() {
   foo();
+}
+
+async def asyncFunc() {
+  print("before foo");
+  syncFunc();
+  print("after foo");
 }
 
 async def asyncMain() {
   print("Starting asyncMain!");
-  // asyncFunc();
-  print("After foo!");
+  await asyncFunc();
+  print("After asyncFunc!");
 }
 
 print("Before starting asyncMain from a synchronous context");
