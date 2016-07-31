@@ -7,6 +7,27 @@ assert(true or false);
 assert(not (true and false));
 assert(not (false or false));
 assert(true and true);
+assert(true is true);
+assert(true is not false);
+assert(null is null);
+assert(5 is 5);
+assert(5 #< 10);
+assert(not (10 #< 5));
+assert(6 #<= 6);
+assert(6 #<= 10);
+assert(not (10 #<= 6));
+assert(10 #> 6);
+
+assert(5 == 5);
+assert(not (5 == 10));
+assert(5 < 10);
+assert(not (10 < 5));
+
+assert("hello world" == "hello world");
+assert("hello world" != "hello world2");
+
+assert([1, 2, 3] == [1, 2, 3]);
+assert(not ([1, 2, 3] is [1, 2, 3]));
 
 {
   let value = false;

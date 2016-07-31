@@ -105,6 +105,7 @@ const symbols = [
   "(", ")", "[", "]", "{", "}", ",", ".",
   ";", "#", "$", "=", "?", ":",
   "+", "-", "*", "/", "%", "++", "--",
+  "#<", "#<=", "#>", "#>=",
   "==", "!=", "<", ">", "<=", ">=", "!", "&&", "||",
   "+=", "-=", "*=", "/=", "%=",
 ].sort().reverse();
@@ -502,7 +503,9 @@ class Parser {
     let expr = this.parseAdditive();
     const token = this.peek();
     if (this.consume("==") || this.consume("!=") || this.consume("<") ||
-        this.consume("<=") || this.consume(">=") || this.consume(">")) {
+        this.consume("<=") || this.consume(">=") || this.consume(">") ||
+        this.consume("#<") || this.consume("#>") || this.consume("#<=") ||
+        this.consume("#>=")) {
       const right = this.parseAdditive();
       return {
         "type": "BinaryOperator",
@@ -983,6 +986,7 @@ class CodeGenerator {
         const op = {
           "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
           "or": "||", "and": "&&", "is": "===", "is not": "!==",
+          "#<": "<", "#>": ">", "#<=": "<=", "#>=": ">=",
         }[node.op];
         if (op !== undefined) {
           return "(" + left + op + right + ")";
@@ -990,6 +994,7 @@ class CodeGenerator {
       }
       const op = {
         "==": "op__eq__", "!=": "op__ne__",
+        "<": "op__lt__", "<=": "op__le__", ">": "op__gt__", ">=": "op__ge__",
       }[node.op];
       if (op !== undefined) {
         return op + "(stack," + left + "," + right + ")";
