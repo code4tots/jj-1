@@ -99,6 +99,7 @@ const keywords = [
   "class", "def", "async", "await",
   "is", "not", "new",
   "for", "if", "else", "while", "break", "continue", "return",
+  "var", "let", "const",
 ];
 const symbols = [
   "(", ")", "[", "]", "{", "}", ",", ".",
@@ -713,6 +714,11 @@ class CodeGenerator {
     case "Return": {
       return "\nreturn " + this.translateOuterExpression(node.expr) + ";";
     }
+    case "Declaration": {
+      const exprstr = node.val === null ?
+          "" : " = " + this.translateOuterExpression(node.val);
+      return "\nlet " + variablePrefix + node.name + exprstr + ";";
+    }
     default:
       throw new TranspileError(
           "Unrecognized statement: " + node.type, node.token);
@@ -1023,9 +1029,19 @@ function asyncfHelper(generatorObject, resolve, reject, val, thr) {
 //// Builtins
 
 function jjlen(stack, xs) {
-  if (Array.isArray(xs)) {
+  if (Array.isArray(xs) || typeof xs === "string") {
     return xs.length;
+  } else {
+    throw new Error("No len for " + xs);
   }
+}
+
+function jjerror(stack, message) {
+  throw new Error(message);
+}
+
+function jjgetStackTraceMessage(stack) {
+  return getStackTraceMessageFromStack(stack);
 }
 
 `;
@@ -1040,10 +1056,6 @@ const builtinPrelude = `
 
 def print(x) {
   #console#log(x);
-}
-
-def getStackTraceMessage() {
-  return #getStackTraceMessageFromStack(#stack);
 }
 
 `;
@@ -1107,9 +1119,11 @@ function transpileProgram(uriTextPairs) {
          "\nconst debugInfo = " + JSON.stringify(cg.getDebugInfo()) + ";" +
          "\nconst packageTable = Object.create(null);" + packageTableStr +
          "\nconst uriTable = Object.create(null);" + uriTableStr +
+         "\nconst stack = [];" +
          transpiledBuiltinPrelude +
-         "\ntryAndCatch(stack => importUri(stack, " +
-             JSON.stringify(startUri) + "));" +
+         "\ntryAndCatch(stack => {" +
+         "\n  importUri(stack, " + JSON.stringify(startUri) + ");" +
+         "\n})" +
          "\n})();";
 }
 
