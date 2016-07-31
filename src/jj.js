@@ -97,13 +97,13 @@ class Token {
 const keywords = [
   "package", "import",
   "class", "def", "async", "await",
-  "is", "not", "new",
+  "is", "not", "new", "true", "false", "null", "or", "and",
   "for", "if", "else", "while", "break", "continue", "return",
   "var", "let", "const",
 ];
 const symbols = [
   "(", ")", "[", "]", "{", "}", ",", ".",
-  ";", "#", "$", "=",
+  ";", "#", "$", "=", "?", ":",
   "+", "-", "*", "/", "%", "++", "--",
   "==", "!=", "<", ">", "<=", ">=", "!", "&&", "||",
   "+=", "-=", "*=", "/=", "%=",
@@ -397,6 +397,20 @@ class Parser {
         "name": name,
         "val": val,
       };
+    } else if (this.consume("if")) {
+      const cond = this.parseExpression();
+      const body = this.parseStatement();
+      let other = null;
+      if (this.consume("else")) {
+        other = this.parseStatement();
+      }
+      return {
+        "type": "If",
+        "token": token,
+        "cond": cond,
+        "body": body,
+        "other": other,
+      };
     } else if (this.consume("return")) {
       const expr = this.parseExpression();
       this.expect(";");
@@ -416,6 +430,146 @@ class Parser {
     }
   }
   parseExpression() {
+    return this.parseConditional();
+  }
+  parseConditional() {
+    const expr = this.parseOr();
+    const token = this.peek();
+    if (this.consume("?")) {
+      const left = this.parseExpression();
+      this.expect(":");
+      const right = this.parseConditional();
+      return {
+        "type": "ConditionalOperator",
+        "token": token,
+        "cond": expr,
+        "left": left,
+        "right": right,
+      };
+    }
+    return expr;
+  }
+  parseOr() {
+    let expr = this.parseAnd();
+    while (true) {
+      const token = this.peek();
+      if (this.consume("or")) {
+        expr = {
+          "type": "BinaryOperator",
+          "token": token,
+          "op": "or",
+          "left": expr,
+          "right": this.parseAnd(),
+        };
+        continue;
+      }
+      break;
+    }
+    return expr;
+  }
+  parseAnd() {
+    let expr = this.parseNot();
+    while (true) {
+      const token = this.peek();
+      if (this.consume("and")) {
+        expr = {
+          "type": "BinaryOperator",
+          "token": token,
+          "op": "and",
+          "left": expr,
+          "right": this.parseNot(),
+        };
+        continue;
+      }
+      break;
+    }
+    return expr;
+  }
+  parseNot() {
+    const token = this.peek();
+    if (this.consume("not")) {
+      const expr = this.parseComparison();
+      return {
+        "type": "PrefixOperator",
+        "token": token,
+        "op": "not",
+        "expr": expr,
+      };
+    }
+    return this.parseComparison();
+  }
+  parseComparison() {
+    let expr = this.parseAdditive();
+    const token = this.peek();
+    if (this.consume("==") || this.consume("!=") || this.consume("<") ||
+        this.consume("<=") || this.consume(">=") || this.consume(">")) {
+      const right = this.parseAdditive();
+      return {
+        "type": "BinaryOperator",
+        "token": token,
+        "op": token.type,
+        "left": expr,
+        "right": right,
+      };
+    } else if (this.consume("is")) {
+      const op = this.consume("not") ? "is not" : "is";
+      const right = this.parseAdditive();
+      return {
+        "type": "BinaryOperator",
+        "token": token,
+        "op": op,
+        "left": expr,
+        "right": right,
+      };
+    }
+    return expr;
+  }
+  parseAdditive() {
+    let expr = this.parseMultiplicative();
+    while (true) {
+      const token = this.peek();
+      if (this.consume("+") || this.consume("-")) {
+        expr = {
+          "type": "BinaryOperator",
+          "token": token,
+          "op": token.type,
+          "left": expr,
+          "right": this.parseMultiplicative(),
+        };
+        continue;
+      }
+      break;
+    }
+    return expr;
+  }
+  parseMultiplicative() {
+    let expr = this.parsePrefix();
+    while (true) {
+      const token = this.peek();
+      if (this.consume("*") || this.consume("/") || this.consume("%")) {
+        expr = {
+          "type": "BinaryOperator",
+          "token": token,
+          "op": token.type,
+          "left": expr,
+          "right": this.parsePrefix(),
+        };
+        continue;
+      }
+      break;
+    }
+    return expr;
+  }
+  parsePrefix() {
+    const token = this.peek();
+    if (this.consume("+") || this.consume("-")) {
+      return {
+        "type": "PrefixOperator",
+        "token": token,
+        "op": token.type,
+        "expr": this.parsePostfix(),
+      };
+    }
     return this.parsePostfix();
   }
   parseArgumentList() {
@@ -568,7 +722,17 @@ class Parser {
   }
   parsePrimary() {
     const token = this.peek();
-    if (this.consume("NUMBER")) {
+    if (this.consume(openParen)) {
+      const expr = this.parseExpression();
+      this.expect(closeParen);
+      return expr;
+    } else if (this.consume("null") || this.consume("true") ||
+        this.consume("false")) {
+      return {
+        "type": token.type,
+        "token": token,
+      };
+    } else if (this.consume("NUMBER")) {
       return {
         "type": "Number",
         "token": token,
@@ -719,6 +883,13 @@ class CodeGenerator {
           "" : " = " + this.translateOuterExpression(node.val);
       return "\nlet " + variablePrefix + node.name + exprstr + ";";
     }
+    case "If": {
+      const cond = this.translateOuterExpression(node.cond);
+      const body = this.translateStatement(node.body);
+      const other = node.other === null ?
+          "" : "else " + this.translateStatement(node.other);
+      return "\nif (" + cond + ")" + body + other;
+    }
     default:
       throw new TranspileError(
           "Unrecognized statement: " + node.type, node.token);
@@ -752,6 +923,10 @@ class CodeGenerator {
   }
   translateInnerExpression(node) {
     switch(node.type) {
+    case "null":
+    case "true":
+    case "false":
+      return node.type;
     case "FunctionCall": {
       const owner = this.translateInnerExpression(node.owner);
       const isNative = node.isNative;
@@ -769,6 +944,11 @@ class CodeGenerator {
       const isNative = node.isNative;
       return isNative ? node.name : variablePrefix + node.name;
     }
+    case "SetVariable": {
+      const isNative = node.isNative;
+      return (isNative ? node.name : variablePrefix + node.name) +
+             " = " + this.translateInnerExpression(node.val);
+    }
     case "Number":
       return node.val;
     case "String":
@@ -782,6 +962,31 @@ class CodeGenerator {
             node.token);
       }
       return "(yield " + this.translateInnerExpression(node.expr) + ")";
+    }
+    case "PrefixOperator": {
+      const op = {"not": "!", "+": "+", "-": "-"}[node.op];
+      if (op === undefined) {
+        throw new TranspileError(
+            "No such prefix operator: " + node.op, node.token);
+      }
+      return "(" + op + this.translateInnerExpression(node.expr) + ")";
+    }
+    case "ConditionalOperator": {
+      return "(" + this.translateInnerExpression(node.cond) +
+             "?" + this.translateInnerExpression(node.left) +
+             ":" + this.translateInnerExpression(node.right) + ")";
+    }
+    case "BinaryOperator": {
+      const op = {
+        "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+        "or": "||", "and": "&&",
+      }[node.op];
+      if (op === undefined) {
+        throw new TranspileError(
+            "No such binary operator: " + node.op, node.token);
+      }
+      return "(" + this.translateInnerExpression(node.left) + op +
+             this.translateInnerExpression(node.right) + ")";
     }
     case "Function": {
       const isNative = node.isNative;
@@ -1056,6 +1261,18 @@ const builtinPrelude = `
 
 def print(x) {
   #console#log(x);
+}
+
+def assert(x, /message) {
+  if not x {
+    error("Assertion error: " + (message ? message : ""));
+  }
+}
+
+def assertEqual(a, b, /message) {
+  if a != b {
+    error("Assert expected " + str(a) + " to equal " + str(b));
+  }
 }
 
 `;

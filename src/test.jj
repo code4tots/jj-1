@@ -1,2 +1,21 @@
 
 print(getStackTraceMessage());
+
+assert(true);
+assert(not false);
+assert(true or false);
+assert(not (true and false));
+assert(not (false or false));
+assert(true and true);
+
+{
+  let value = false;
+  if false {
+    error("False should not be true!");
+  } else {
+    value = true;
+  }
+  assert(value);
+}
+
+assertEqual(true, true);
