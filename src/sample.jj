@@ -6,7 +6,6 @@ print("Hello world!");
 print(len([1, 2, 3]));
 
 def syncFunc() {
-  foo();
 }
 
 async def asyncFunc() {

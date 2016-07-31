@@ -649,7 +649,7 @@ class Parser {
   }
 }
 
-function parse(uri, text) {
+function parseModule(uri, text) {
   return new Parser(uri, text).parseModule();
 }
 
@@ -1029,7 +1029,7 @@ function jjlen(stack, xs) {
 
 `;
 
-function transpile(uriTextPairs) {
+function transpileProgram(uriTextPairs) {
   const packageTable = Object.create(null);  // package-name => uri
   const uriTable = Object.create(null);  // uri => code
   const startUri = uriTextPairs[uriTextPairs.length-1][0];
@@ -1067,7 +1067,7 @@ function transpile(uriTextPairs) {
                            "] = " + JSON.stringify(uri) + ";";
       }
     } else {
-      const mod = parse(uri, text);
+      const mod = parseModule(uri, text);
       code = cg.translateModule(mod);
       addUri(uri, code);
       for (const pkg of mod.packages) {
@@ -1091,6 +1091,9 @@ function transpile(uriTextPairs) {
          "\n})();";
 }
 
+exports.parseModule = parseModule;
+exports.transpileProgram = transpileProgram;
+
 if (require.main === module) {
   const fs = require("fs");
   const uriTextPairs = [];
@@ -1098,7 +1101,7 @@ if (require.main === module) {
     const text = fs.readFileSync(uri).toString();
     uriTextPairs.push([uri, text]);
   }
-  console.log(transpile(uriTextPairs));
+  console.log(transpileProgram(uriTextPairs));
 }
 
 })(module.exports);
