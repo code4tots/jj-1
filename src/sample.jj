@@ -1,0 +1,23 @@
+def print(x) {
+  #console#log(x);
+}
+
+print("Hello world!");
+print(len([1, 2, 3]));
+
+async def asyncFunc() {
+  foo();
+}
+
+async def asyncMain() {
+  print("Starting asyncMain!");
+  // asyncFunc();
+  print("After foo!");
+}
+
+print("Before starting asyncMain from a synchronous context");
+asyncMain();
+print("After starting asyncMain from a synchronous context");
+
+
+
