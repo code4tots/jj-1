@@ -977,16 +977,25 @@ class CodeGenerator {
              ":" + this.translateInnerExpression(node.right) + ")";
     }
     case "BinaryOperator": {
-      const op = {
-        "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
-        "or": "||", "and": "&&",
-      }[node.op];
-      if (op === undefined) {
-        throw new TranspileError(
-            "No such binary operator: " + node.op, node.token);
+      const left = this.translateInnerExpression(node.left);
+      const right = this.translateInnerExpression(node.right);
+      {
+        const op = {
+          "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+          "or": "||", "and": "&&", "is": "===", "is not": "!==",
+        }[node.op];
+        if (op !== undefined) {
+          return "(" + left + op + right + ")";
+        }
       }
-      return "(" + this.translateInnerExpression(node.left) + op +
-             this.translateInnerExpression(node.right) + ")";
+      const op = {
+        "==": "op__eq__", "!=": "op__ne__",
+      }[node.op];
+      if (op !== undefined) {
+        return op + "(stack," + left + "," + right + ")";
+      }
+     throw new TranspileError(
+         "No such binary operator: " + node.op, node.token);
     }
     case "Function": {
       const isNative = node.isNative;
@@ -1247,6 +1256,51 @@ function jjerror(stack, message) {
 
 function jjgetStackTraceMessage(stack) {
   return getStackTraceMessageFromStack(stack);
+}
+
+function op__eq__(stack, a, b) {
+  if (a === null || a === undefined || typeof a === "boolean" ||
+      typeof a === "number" || typeof a === "string") {
+    return a === b;
+  }
+  if (Array.isArray(a)) {
+    const len = a.length;
+    if (!Array.isArray(b) || len !== b.length) {
+      return false;
+    }
+    for (let i = 0; i < len; i++) {
+      if (!op__eq__(stack, a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return a.jj__eq__(stack, b);
+}
+
+function op__ne__(stack, a, b) {
+  return !op__eq__(stack, a, b);
+}
+
+function op__lt__(stack, a, b) {
+  if (typeof a === "bool" || typeof a === "number" || typeof a === "string") {
+    return a < b;
+  }
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b)) {
+      throw new Error("Tried to compare Array with non-Array: " + b);
+    }
+    const len = Math.min(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      if (op__lt__(stack, a[i], b[i])) {
+        return true;
+      } else if (op__lt__(stack, b[i], a[i])) {
+        return false;
+      }
+    }
+    return a.length < b.length;
+  }
+  return a.jj__lt__(stack, b);
 }
 
 `;
