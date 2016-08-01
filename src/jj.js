@@ -372,7 +372,31 @@ class Parser {
   }
   parseStatement() {
     const token = this.peek();
-    if (this.atFunction()) {
+    if (this.consume("class")) {
+      const name = this.expect("NAME").val;
+      let base = null;
+      if (this.consume("extends")) {
+        base = this.parseExpression();
+      }
+      this.expect(openBrace);
+      const methods = [];
+      while (!this.consume(closeBrace)) {
+        const func = this.parsePrimary();
+        if (func.type !== "Function" || func.name === null) {
+          throw new TranspileError(
+              "The body of a class statement can only contain named " +
+              "functions",
+              func.token);
+        }
+        methods.push(func);
+      }
+      return {
+        "type": "Class",
+        "name": name,
+        "base": base,
+        "methods": methods,
+      };
+    } else if (this.atFunction()) {
       const func = this.parsePrimary();
       if (func.name === null) {
         throw new TranspileError(
@@ -756,6 +780,15 @@ class Parser {
         "token": token,
         "exprlist": exprlist,
       };
+    } else if (this.consume("new")) {
+      const cls = this.parsePrimary();
+      const exprlist = this.parseExpressionList(openParen, closeParen);
+      return {
+        "type": "New",
+        "token": token,
+        "cls": cls,
+        "exprlist": exprlist,
+      };
     } else if (this.consume("await")) {
       return {
         "type": "Await",
@@ -825,7 +858,7 @@ function parseModule(uri, text) {
 
 //// CodeGenerator
 
-const attributePrefix = "jj";
+const attributePrefix = "aa";
 const variablePrefix = "jj";
 
 class CodeGenerator {
@@ -872,6 +905,17 @@ class CodeGenerator {
     switch(node.type) {
     case "ExpressionStatement":
       return "\n" + this.translateOuterExpression(node.expr) + ";";
+    case "Class":
+      const base = node.base === null ?
+          "jjObject" : this.translateOuterExpression(node.base);
+      let str = "\nclass " + variablePrefix + node.name + " extends " +
+                base + "{}";
+      for (const func of node.methods) {
+        str += "\n" + variablePrefix + node.name + ".prototype." +
+               attributePrefix + func.name + " = " +
+               this.translateInnerExpression(func) + ";";
+      }
+      return str;
     case "FunctionStatement":
       return "\nconst " + variablePrefix + node.func.name + " = " +
              this.translateInnerExpression(node.func) + ";";
@@ -944,6 +988,11 @@ class CodeGenerator {
       const name = isNative ? node.name : attributePrefix + node.name;
       const exprlist = this.translateExpressionList(node.exprlist, isNative);
       return owner + "." + name + "(" + exprlist + ")";
+    }
+    case "New": {
+      const cls = this.translateInnerExpression(node.cls);
+      const exprlist = this.translateExpressionList(node.exprlist);
+      return "new (" + cls + ")(" + exprlist + ")";
     }
     case "GetVariable": {
       const isNative = node.isNative;
@@ -1267,8 +1316,35 @@ function asyncfHelper(generatorObject, resolve, reject, val, thr) {
 
 //// Builtins
 
+class jjObject {
+  aa__str__(stack) {
+    return this.aa__repr__(stack);
+  }
+  aa__repr__(stack) {
+    return "<" + this.constructor.name + " instance>";
+  }
+}
+
 function jjsplit(stack, str, delimiter) {
   delimiter = delimiter === undefined ? /\s+/ : delimiter;
+}
+
+function jjrepr(stack, x) {
+  if (x instanceof jjObject) {
+    return x.aa__repr__(stack);
+  } else if (typeof x === "string") {
+    return JSON.stringify(x);
+  } else {
+    return "" + x;
+  }
+}
+
+function jjstr(stack, x) {
+  if (x instanceof jjObject) {
+    return x.aa__str__(stack);
+  } else {
+    return "" + x;
+  }
 }
 
 function jjlen(stack, xs) {
@@ -1304,7 +1380,7 @@ function op__eq__(stack, a, b) {
     }
     return true;
   }
-  return a.jj__eq__(stack, b);
+  return a.aa__eq__(stack, b);
 }
 
 function op__ne__(stack, a, b) {
@@ -1329,21 +1405,21 @@ function op__lt__(stack, a, b) {
     }
     return a.length < b.length;
   }
-  return a.jj__lt__(stack, b);
+  return a.aa__lt__(stack, b);
 }
 
 function op__getitem__(stack, owner, key) {
   if (Array.isArray(owner) && typeof key === "number") {
     return owner[key];
   }
-  return owner.jj__getitem__(stack, key);
+  return owner.aa__getitem__(stack, key);
 }
 
 function op__setitem__(stack, owner, key, value) {
   if (Array.isArray(owner) && typeof key === "number") {
     return owner[key] = value;
   }
-  return owner.jj__setitem__(stack, key, value);
+  return owner.aa__setitem__(stack, key, value);
 }
 
 `;
@@ -1357,11 +1433,7 @@ function op__setitem__(stack, owner, key, value) {
 const builtinPrelude = `
 
 def print(x) {
-  #console#log(x);
-}
-
-def str(x) {
-  return "" #+ x;
+  #console#log(str(x));
 }
 
 def assert(x, /message) {
@@ -1372,7 +1444,7 @@ def assert(x, /message) {
 
 def assertEqual(a, b, /message) {
   if a != b {
-    error("Assert expected " + str(a) + " to equal " + str(b));
+    error("Assert expected " + repr(a) + " to equal " + repr(b));
   }
 }
 

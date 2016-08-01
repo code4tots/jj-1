@@ -1,4 +1,6 @@
-// stack trace test
+//// stack trace test
+// TODO: Instead of printing the stack trace,
+// check the string.
 {
   def func1(b) {
     if b {
@@ -16,6 +18,7 @@
   print(func1(true));
 }
 
+//// sanity check
 assert(true);
 assert(not false);
 assert(true or false);
@@ -62,4 +65,35 @@ assertEqual([1, 2, 3][1], 2);
 }
 
 assertEqual(true, true);
+
+
+//// Class, method calls and new
+{
+  class Foo {}
+  assertEqual(repr(new Foo()), "<jjFoo instance>");
+  assertEqual(str(new Foo()), "<jjFoo instance>");
+
+  class Foo2 {
+    def __repr__() {
+      return "<Foo2 repr>";
+    }
+    def __str__() {
+      return "<Foo2 str>";
+    }
+  }
+  assertEqual(repr(new Foo2()), "<Foo2 repr>");
+  assertEqual(str(new Foo2()), "<Foo2 str>");
+
+  class Foo3 {
+    def bar() {
+      return "inside bar";
+    }
+  }
+  let foo = new Foo3();
+  assertEqual(foo.bar(), "inside bar");
+}
+
+print("tests pass!");
+
+
 
