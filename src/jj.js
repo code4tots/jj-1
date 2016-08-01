@@ -105,7 +105,7 @@ const symbols = [
   "(", ")", "[", "]", "{", "}", ",", ".",
   ";", "#", "$", "=", "?", ":",
   "+", "-", "*", "/", "%", "++", "--",
-  "#<", "#<=", "#>", "#>=",
+  "#<", "#<=", "#>", "#>=", "#+", "#-", "#*", "#/", "#%",
   "==", "!=", "<", ">", "<=", ">=", "!", "&&", "||",
   "+=", "-=", "*=", "/=", "%=",
 ].sort().reverse();
@@ -531,7 +531,8 @@ class Parser {
     let expr = this.parseMultiplicative();
     while (true) {
       const token = this.peek();
-      if (this.consume("+") || this.consume("-")) {
+      if (this.consume("+") || this.consume("-") || this.consume("#+") ||
+          this.consume("#-")) {
         expr = {
           "type": "BinaryOperator",
           "token": token,
@@ -549,7 +550,8 @@ class Parser {
     let expr = this.parsePrefix();
     while (true) {
       const token = this.peek();
-      if (this.consume("*") || this.consume("/") || this.consume("%")) {
+      if (this.consume("*") || this.consume("/") || this.consume("%") ||
+          this.consume("#*") || this.consume("#/") || this.consume("#%")) {
         expr = {
           "type": "BinaryOperator",
           "token": token,
@@ -952,6 +954,23 @@ class CodeGenerator {
       return (isNative ? node.name : variablePrefix + node.name) +
              " = " + this.translateInnerExpression(node.val);
     }
+    case "GetItem": {
+      const owner = this.translateInnerExpression(node.owner);
+      const key = this.translateInnerExpression(node.key);
+      if (node.isNative) {
+        return owner + "[" + key + "]";
+      }
+      return "op__getitem__(stack," + owner + "," + key + ")";
+    }
+    case "SetItem": {
+      const owner = this.translateInnerExpression(node.owner);
+      const key = this.translateInnerExpression(node.key);
+      const val = this.translateInnerExpression(node.val);
+      if (node.isNative) {
+        return "(" + owner + "[" + key + "] = " + val + ")";
+      }
+      return "op__setitem__(stack," + owner + "," + key + "," + val + ")";
+    }
     case "Number":
       return node.val;
     case "String":
@@ -987,6 +1006,7 @@ class CodeGenerator {
           "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
           "or": "||", "and": "&&", "is": "===", "is not": "!==",
           "#<": "<", "#>": ">", "#<=": "<=", "#>=": ">=",
+          "#+": "+", "#-": "-", "#*": "*", "#/": "/", "#%": "%",
         }[node.op];
         if (op !== undefined) {
           return "(" + left + op + right + ")";
@@ -1247,6 +1267,10 @@ function asyncfHelper(generatorObject, resolve, reject, val, thr) {
 
 //// Builtins
 
+function jjsplit(stack, str, delimiter) {
+  delimiter = delimiter === undefined ? /\s+/ : delimiter;
+}
+
 function jjlen(stack, xs) {
   if (Array.isArray(xs) || typeof xs === "string") {
     return xs.length;
@@ -1308,6 +1332,20 @@ function op__lt__(stack, a, b) {
   return a.jj__lt__(stack, b);
 }
 
+function op__getitem__(stack, owner, key) {
+  if (Array.isArray(owner) && typeof key === "number") {
+    return owner[key];
+  }
+  return owner.jj__getitem__(stack, key);
+}
+
+function op__setitem__(stack, owner, key, value) {
+  if (Array.isArray(owner) && typeof key === "number") {
+    return owner[key] = value;
+  }
+  return owner.jj__setitem__(stack, key, value);
+}
+
 `;
 
 // Builtin prelude can't just be a separate jj file because
@@ -1320,6 +1358,10 @@ const builtinPrelude = `
 
 def print(x) {
   #console#log(x);
+}
+
+def str(x) {
+  return "" #+ x;
 }
 
 def assert(x, /message) {
@@ -1340,12 +1382,16 @@ function transpileProgram(uriTextPairs) {
   const packageTable = Object.create(null);  // package-name => uri
   const uriTable = Object.create(null);  // uri => code
   const startUri = uriTextPairs[uriTextPairs.length-1][0];
+  let uriTableStr = "";
+  let packageTableStr = "";
   function addPackage(pkg, uri) {
     if (packageTable[pkg]) {
       throw new TranspileError(
           "Duplicate package: " + pkg +
           " (from " + packageTable.get(pkg) + " and " + uri + ")");
     }
+    packageTableStr += "\npackageTable[" + JSON.stringify(pkg) +
+                       "] = " + JSON.stringify(uri) + ";";
     packageTable[pkg] = uri;
   }
   function addUri(uri, code) {
@@ -1353,9 +1399,9 @@ function transpileProgram(uriTextPairs) {
       throw new TranspileError("Duplicate uri: " + uri);
     }
     uriTable[uri] = code;
+    uriTableStr += "\nuriTable[" + JSON.stringify(uri) + "] = " +
+                   "function(stack, uri) {" + code + "\n};";
   }
-  let uriTableStr = "";
-  let packageTableStr = "";
   const cg = new CodeGenerator();
   const transpiledBuiltinPrelude = cg.translateModule(
       parseModule("<prelude>", builtinPrelude));
@@ -1372,8 +1418,6 @@ function transpileProgram(uriTextPairs) {
       addUri(uri, code);
       for (const pkg of pkgs) {
         addPackage(pkg, uri);
-        packageTableStr += "\npackageTable[" + JSON.stringify(pkg) +
-                           "] = " + JSON.stringify(uri) + ";";
       }
     } else {
       const mod = parseModule(uri, text);
@@ -1383,8 +1427,6 @@ function transpileProgram(uriTextPairs) {
         addPackage(pkg, uri);
       }
     }
-    uriTableStr += "\nuriTable[" + JSON.stringify(uri) + "] = " +
-                   "function(stack, uri) {" + code + "\n};";
   }
   return "// Autogenerated from jj->javascript transpiler" +
          "\n// jshint esversion: 6" +
