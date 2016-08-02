@@ -6,6 +6,7 @@ print("Hello world!");
 print(len([1, 2, 3]));
 
 def syncFunc() {
+  print(getStackTraceMessage());
 }
 
 async def asyncFunc() {
