@@ -1517,17 +1517,22 @@ function transpileProgram(uriTextPairs) {
          "\n})();";
 }
 
-exports.parseModule = parseModule;
-exports.transpileProgram = transpileProgram;
-
-if (require.main === module) {
+function transpileFiles(filenames) {
   const fs = require("fs");
   const uriTextPairs = [];
-  for (const uri of process.argv.slice(2)) {
+  for (const uri of filenames) {
     const text = fs.readFileSync(uri).toString();
     uriTextPairs.push([uri, text]);
   }
-  console.log(transpileProgram(uriTextPairs));
+  return transpileProgram(uriTextPairs);
+}
+
+exports.parseModule = parseModule;
+exports.transpileProgram = transpileProgram;
+exports.transpileFiles = transpileFiles;
+
+if (require.main === module) {
+  console.log(transpileFiles(process.argv.slice(2)));
 }
 
 })(module.exports);
