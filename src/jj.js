@@ -3,6 +3,11 @@
 (function(exports) {
 "use strict";
 
+// TODO: When displaying stack traces of asynchronous functions,
+// stitch together the stack for better message.
+// This can be done at the 'then' callbacks, since that's where we can
+// assume 'await' was used -- stitch oldStack and newStack together.
+
 //// TranspileError/Source/Token
 class TranspileError extends Error {
   constructor(message, token) {
@@ -1147,7 +1152,7 @@ function displayError(e, stackOrSnapshot, additionalMessage) {
 
 function resolvePromisePool(promisePool) {
   const resolvePromise = promise => promise.then(() => null, error => {
-    displayError(error, promise.stackSnapshot, "Promise never awaited on");
+    displayError(error, promise.oldStack, "Promise never awaited on");
   });
   for (const promise of Array.from(promisePool)) {
     resolvePromise(promise);
@@ -1156,7 +1161,6 @@ function resolvePromisePool(promisePool) {
 
 function tryAndCatch(f) {
   const stack = [];
-  stack.isAsync = false;
   stack.promisePool = new Set();
   try {
     f(stack);
@@ -1193,24 +1197,24 @@ const statePending = 0;
 const stateResolved = 1;
 const stateRejected = 2;
 class MockPromise {
-  constructor(stack, resolver) {
+  constructor(oldStack, newStack, resolver) {
     // Add this to the promise pool, so that when the promise pool
     // gets cleaned up, we can throw.
-    stack.promisePool.add(this);
+    oldStack.promisePool.add(this);
 
     this.state = statePending;
     this.callbacksSet = false;
-    this.onResolve = null;
-    this.onReject = null;
-    this.promisePool = stack.promisePool;
+    this.onResolveCallback = null;
+    this.onRejectCallback = null;
+    this.promisePool = oldStack.promisePool;
     this.result = null;
 
     // Not sure if I want to copy the entire stack every time
     // I create a new promise.
     // However, I think this will be really useful for situations where
     // I forget to 'await' on promises.
-    this.stackSnapshot = Array.from(stack);
-    this.stackReference = stack;
+    this.oldStack = Array.from(oldStack);
+    this.newStack = newStack;
 
     resolver(result => this.resolve(result), err => this.reject(err));
   }
@@ -1219,18 +1223,18 @@ class MockPromise {
       throw new Error("Resolve/reject called more than once on this promise");
     }
   }
-  then(onResolve, onReject) {
+  then(onResolveCallback, onRejectCallback) {
     if (this.callbacksSet) {
       throw new Error("'then' called more than once on this promise");
     }
     this.promisePool.delete(this);
     this.callbacksSet = true;
-    this.onResolve = onResolve;
-    this.onReject = onReject;
+    this.onResolveCallback = onResolveCallback;
+    this.onRejectCallback = onRejectCallback;
     if (this.state === stateResolved) {
-      onResolve(this.result);
+      this.onResolve(this.result);
     } else if (this.state === stateRejected) {
-      onReject(this.result);
+      this.onReject(this.result);
     }
   }
   resolve(result) {
@@ -1249,6 +1253,17 @@ class MockPromise {
       this.onReject(reason);
     }
   }
+  onResolve(result) {
+    this.cleanup();
+    this.onResolveCallback(result);
+  }
+  onReject(reason) {
+    this.cleanup();
+    this.onRejectCallback(reason);
+  }
+  cleanup() {
+    resolvePromisePool(this.newStack.promisePool);
+  }
 }
 
 function asyncf(generator) {
@@ -1258,35 +1273,25 @@ function asyncf(generator) {
     // we should start a new context.
     // Also include the last frame of synchronous context to document
     // where this asynchronous instance came from.
-    const stack = arguments[0];
-    const startNewContext = !stack.isAsync;
-    const newStack = startNewContext ? [stack[stack.length-1]] : stack;
-    if (startNewContext) {
-      newStack.isAsync = true;
-      newStack.promisePool = new Set();
-      args.push(newStack);
-    } else {
-      args.push(arguments[0]);
-    }
+    const oldStack = arguments[0];
+
+    // NOTE: Before I only started a new context if we were going from
+    // a synchronous context to an asynchronous one. However, I realized
+    // that that wasn't good enough -- if you call multiple async
+    // functions without awaiting on each before going on to the next,
+    // they are going to have to share the call stack, and it's going to get
+    // clobbered. The fix I decided on was to create a new stack trace
+    // for every call to an async function.
+    const newStack = [oldStack[oldStack.length-1]];
+    newStack.promisePool = new Set();
+    args.push(newStack);
     for (let i = 1; i < arguments.length; i++) {
       args.push(arguments[i]);
     }
     const generatorObject = generator.apply(this, args);
-    const promise = new MockPromise(newStack, (resolve, reject) => {
+    const promise = new MockPromise(oldStack, newStack, (resolve, reject) => {
       asyncfHelper(generatorObject, resolve, reject);
     });
-    if (startNewContext) {
-      promise.then(result => {
-        resolvePromisePool(newStack.promisePool);
-      }, e => {
-        // startNextContext promise is always considered to have been
-        // 'awaited' upon. As such, we use stackReference here instead of
-        // stackSnapshot which is only reserved for promises that were
-        // never awaited on.
-        displayError(e, promise.stackReference);
-        resolvePromisePool(newStack.promisePool);
-      });
-    }
     return promise;
   }
 }
@@ -1509,6 +1514,7 @@ function transpileProgram(uriTextPairs) {
          "\nconst debugInfo = " + JSON.stringify(cg.getDebugInfo()) + ";" +
          "\nconst packageTable = Object.create(null);" + packageTableStr +
          "\nconst uriTable = Object.create(null);" + uriTableStr +
+         "\n// this is a mock stack to run the builtin prelude" +
          "\nconst stack = [];" +
          transpiledBuiltinPrelude +
          "\ntryAndCatch(stack => {" +
