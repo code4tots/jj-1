@@ -1,16 +1,29 @@
 // jshint esversion: 6
 
+const jj = require("./jj.js");
+
 (function(exports) {
 "use strict";
 
+const beforeScript = `
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+`;
+
+const afterScript = `
+</script>
+</head>
+<body></body>
+</html>
+`;
+
 if (require.main === module) {
-  const fs = require("fs");
-  const uriTextPairs = [];
-  for (const uri of process.argv.slice(2)) {
-    const text = fs.readFileSync(uri).toString();
-    uriTextPairs.push([uri, text]);
-  }
-  console.log(transpileProgram(uriTextPairs));
+  console.log(
+      beforeScript +
+      jj.transpileFiles(process.argv.slice(2)) +
+      afterScript);
 }
 
 
