@@ -335,6 +335,16 @@ class Parser {
     if (pkgs.length === 0) {
       pkgs.push(token.source.uri);
     }
+    const imports = [];
+    while (this.consume("import")) {
+      const pkgname = this.expect("STRING").val;
+      const alias =
+          this.consume("as") ?
+          this.expect("NAME").val :
+          pkgname.match(/\w+$/);
+      imports.push([pkgname, alias]);
+      this.expect(";");
+    }
     const stmts = [];
     while (!this.at("EOF")) {
       stmts.push(this.parseStatement());
@@ -343,6 +353,7 @@ class Parser {
       "type": "Module",
       "doc": doc,
       "packages": pkgs,
+      "imports": imports,
       "token": token,
       "stmts": stmts,
     };
@@ -410,6 +421,7 @@ class Parser {
       return {
         "type": "FunctionStatement",
         "token": token,
+        "name": func.name,
         "func": func,
       };
     } else if (this.at(openBrace)) {
@@ -903,7 +915,12 @@ class CodeGenerator {
     return this._inverseDebugInfo[message];
   }
   translateModule(node) {
-    let str = node.stmts.map(stmt => this.translateStatement(stmt)).join("");
+    let str = "";
+    for (const [pkgname, alias] of node.imports) {
+      str += "\nconst " + variablePrefix + alias +
+             " = importPackage(stack, '" + pkgname + "');";
+    }
+    str += node.stmts.map(stmt => this.translateStatement(stmt)).join("");
     return str;
   }
   translateStatement(node) {
@@ -1007,6 +1024,11 @@ class CodeGenerator {
       const isNative = node.isNative;
       return (isNative ? node.name : variablePrefix + node.name) +
              " = " + this.translateInnerExpression(node.val);
+    }
+    case "GetAttribute": {
+      const isNative = node.isNative;
+      const owner = this.translateInnerExpression(node.owner);
+      return owner + "." + (isNative ? "" : attributePrefix) + node.name;
     }
     case "GetItem": {
       const owner = this.translateInnerExpression(node.owner);
@@ -1126,6 +1148,7 @@ function importUri(stack, uri) {
       throw new Error("No such module with uri: " + uri);
     }
     const exports = Object.create(null);
+    exports.toString = () => "<module '" + uri + "'>";
     uriTable[uri](stack, exports);
     moduleCache[uri] = exports;
   }
@@ -1478,7 +1501,7 @@ function transpileProgram(uriTextPairs) {
     }
     uriTable[uri] = code;
     uriTableStr += "\nuriTable[" + JSON.stringify(uri) + "] = " +
-                   "function(stack, uri) {" + code + "\n};";
+                   "function(stack, exports) {" + code + "\n};";
   }
   const cg = new CodeGenerator();
   const transpiledBuiltinPrelude = cg.translateModule(
@@ -1488,7 +1511,7 @@ function transpileProgram(uriTextPairs) {
     if (uri.endsWith(".js")) {
       code = "\n" + text;
       const pkgs = [];
-      const re = /^\/\/ jj package: ([a-zA-Z0-9_.]+)$/;
+      const re = /^\/\/ jj package: ([a-zA-Z0-9_.]+)$/mg;
       let result = null;
       while ((result = re.exec(code)) !== null) {
         pkgs.push(result[1]);
@@ -1500,6 +1523,16 @@ function transpileProgram(uriTextPairs) {
     } else {
       const mod = parseModule(uri, text);
       code = cg.translateModule(mod).replace(/\n/g, "\n  ");
+      for (const stmt of mod.stmts) {
+        switch(stmt.type) {
+        case "FunctionStatement":
+        case "Class":
+        case "Declaration":
+          code += "\n  exports." + attributePrefix + stmt.name + " = " +
+                  variablePrefix + stmt.name + ";";
+          break;
+        }
+      }
       addUri(uri, code);
       for (const pkg of mod.packages) {
         addPackage(pkg, uri);

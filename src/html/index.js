@@ -11,6 +11,7 @@ function importUri(stack, uri) {
       throw new Error("No such module with uri: " + uri);
     }
     const exports = Object.create(null);
+    exports.toString = () => "<module '" + uri + "'>";
     uriTable[uri](stack, exports);
     moduleCache[uri] = exports;
   }
@@ -315,12 +316,25 @@ function op__setitem__(stack, owner, key, value) {
 
 
 const moduleCache = Object.create(null);
-const debugInfo = ["??@??@??",".print@<prelude>@4",".assert@<prelude>@8",".assert@<prelude>@9",".assertEqual@<prelude>@14",".assertEqual@<prelude>@15",".@htmldemo.jj@5"];
+const debugInfo = ["??@??@??",".print@<prelude>@4",".assert@<prelude>@8",".assert@<prelude>@9",".assertEqual@<prelude>@14",".assertEqual@<prelude>@15",".@htmldemo.jj@7",".@htmldemo.jj@9",".@htmldemo.jj@10"];
 const packageTable = Object.create(null);
+packageTable["core.dom"] = "lib\\dom.js";
 packageTable["htmldemo.jj"] = "htmldemo.jj";
 const uriTable = Object.create(null);
-uriTable["htmldemo.jj"] = function(stack, uri) {
+uriTable["lib\\dom.js"] = function(stack, exports) {
+// jshint esversion: 6
+// jj package: core.dom
+
+exports.aafoo = "hello dom.js";
+
+
+
+};
+uriTable["htmldemo.jj"] = function(stack, exports) {
+  const jjdom = importPackage(stack, 'core.dom');
   (stack.push(6),popStack(stack,jjprint(stack,"Hi")));
+  (stack.push(7),popStack(stack,jjprint(stack,jjdom.aafoo)));
+  (stack.push(8),popStack(stack,jjprint(stack,jjdom)));
 };
 // this is a mock stack to run the builtin prelude
 const stack = [];
@@ -332,7 +346,7 @@ const jjassert = function jjassert(stack,jjx,jjmessage)
 {
   if ((stack.push(2),popStack(stack,(!jjx))))
   {
-    stack.push(3);popStack(stack,jjerror(stack,("Assertion error: "+(jjmessage?jjmessage:""))));
+    (stack.push(3),popStack(stack,jjerror(stack,("Assertion error: "+(jjmessage?jjmessage:"")))));
   }
 };
 const jjassertEqual = function jjassertEqual(stack,jja,jjb,jjmessage)
