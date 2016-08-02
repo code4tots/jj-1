@@ -327,13 +327,10 @@ class Parser {
   parseModule() {
     const token = this.peek();
     const doc = this.at("STRING") ? this.expect("STRING").val : "";
-    const pkgs = [];
+    const pkgs = [token.source.uri];
     while (this.consume("package")) {
       pkgs.push(this.expect("STRING").val);
       this.expect(";");
-    }
-    if (pkgs.length === 0) {
-      pkgs.push(token.source.uri);
     }
     const imports = [];
     while (this.consume("import")) {
