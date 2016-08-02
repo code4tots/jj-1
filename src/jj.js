@@ -1293,7 +1293,7 @@ function asyncf(generator) {
       asyncfHelper(generatorObject, resolve, reject);
     });
     return promise;
-  }
+  };
 }
 
 function asyncfHelper(generatorObject, resolve, reject, val, thr) {
@@ -1393,7 +1393,8 @@ function op__ne__(stack, a, b) {
 }
 
 function op__lt__(stack, a, b) {
-  if (typeof a === "bool" || typeof a === "number" || typeof a === "string") {
+  if (typeof a === "boolean" || typeof a === "number" ||
+      typeof a === "string") {
     return a < b;
   }
   if (Array.isArray(a)) {
@@ -1422,7 +1423,7 @@ function op__getitem__(stack, owner, key) {
 
 function op__setitem__(stack, owner, key, value) {
   if (Array.isArray(owner) && typeof key === "number") {
-    return owner[key] = value;
+    return (owner[key] = value);
   }
   return owner.aa__setitem__(stack, key, value);
 }
@@ -1519,7 +1520,7 @@ function transpileProgram(uriTextPairs) {
          transpiledBuiltinPrelude +
          "\ntryAndCatch(stack => {" +
          "\n  importUri(stack, " + JSON.stringify(startUri) + ");" +
-         "\n})" +
+         "\n});" +
          "\n})();";
 }
 
