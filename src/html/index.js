@@ -316,7 +316,7 @@ function op__setitem__(stack, owner, key, value) {
 
 
 const moduleCache = Object.create(null);
-const debugInfo = ["??@??@??",".print@<prelude>@4",".assert@<prelude>@8",".assert@<prelude>@9",".assertEqual@<prelude>@14",".assertEqual@<prelude>@15",".@canvasdemo.jj@3",".@canvasdemo.jj@4",".@canvasdemo.jj@5",".@canvasdemo.jj@8",".@canvasdemo.jj@9",".@canvasdemo.jj@12",".@canvasdemo.jj@13",".@canvasdemo.jj@14",".@canvasdemo.jj@15",".@canvasdemo.jj@16",".@canvasdemo.jj@19",".@canvasdemo.jj@20",".@canvasdemo.jj@21",".@canvasdemo.jj@23",".@canvasdemo.jj@24",".@canvasdemo.jj@25",".@canvasdemo.jj@26",".@canvasdemo.jj@27",".@canvasdemo.jj@28"];
+const debugInfo = ["??@??@??",".print@<prelude>@4",".assert@<prelude>@8",".assert@<prelude>@9",".assertEqual@<prelude>@14",".assertEqual@<prelude>@15",".@canvasdemo.jj@3",".@canvasdemo.jj@4",".@canvasdemo.jj@5",".@canvasdemo.jj@8",".@canvasdemo.jj@11",".@canvasdemo.jj@14",".@canvasdemo.jj@15",".@canvasdemo.jj@16",".@canvasdemo.jj@17",".@canvasdemo.jj@18",".@canvasdemo.jj@21",".@canvasdemo.jj@22",".@canvasdemo.jj@23",".@canvasdemo.jj@25",".@canvasdemo.jj@26",".@canvasdemo.jj@27",".@canvasdemo.jj@28",".@canvasdemo.jj@29",".@canvasdemo.jj@30"];
 const packageTable = Object.create(null);
 packageTable["simple.canvas"] = "lib\\htmlcanvas.js";
 packageTable["canvasdemo.jj"] = "canvasdemo.jj";
@@ -389,7 +389,7 @@ uriTable["canvasdemo.jj"] = function(stack, exports) {
   (stack.push(6),popStack(stack," create a new canvas element and add it to the document "));
   let jjcanvas = (stack.push(7),popStack(stack,new (jjlibcanvas.aaCanvas)(stack)));
   (stack.push(8),popStack(stack,jjlibcanvas.aainstallCanvas(stack,jjcanvas)));
-  (stack.push(9),popStack(stack," setting width "));
+  (stack.push(9),popStack(stack," setting width\r\nBy default, both width and height are 300px.\r\n"));
   (stack.push(10),popStack(stack,jjcanvas.aasetWidth(stack,600)));
   (stack.push(11),popStack(stack," drawing rectangles "));
   (stack.push(12),popStack(stack,jjcanvas.aasetFillStyle(stack,"rgb(200, 0, 0)")));
