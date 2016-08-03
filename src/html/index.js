@@ -168,8 +168,7 @@ function asyncf(generator) {
     // they are going to have to share the call stack, and it's going to get
     // clobbered. The fix I decided on was to create a new stack trace
     // for every call to an async function.
-    const newStack = [oldStack[oldStack.length-1]];
-    newStack.promisePool = new Set();
+    const newStack = makeNewStack(oldStack);
     args.push(newStack);
     for (let i = 1; i < arguments.length; i++) {
       args.push(arguments[i]);
@@ -180,6 +179,12 @@ function asyncf(generator) {
     });
     return promise;
   };
+}
+
+function makeNewStack(oldStack) {
+  const newStack = [oldStack[oldStack.length-1]];
+  newStack.promisePool = new Set();
+  return newStack;
 }
 
 function asyncfHelper(generatorObject, resolve, reject, val, thr) {
@@ -213,6 +218,30 @@ class jjObject {
   }
   aa__repr__(stack) {
     return "<" + this.constructor.name + " instance>";
+  }
+}
+
+class jjAsyncQueue {
+  constructor() {
+    this._events = [];  // Events awaiting promises
+    this._resolves = [];  // 'resolve' methods for Promises awaiting events
+  }
+  aaasyncPop(stack) {
+    return new MockPromise(stack, makeNewStack(stack), (resolve, reject) => {
+      if (this._events.length > 0) {
+        resolve(this._events.pop());
+      } else {
+        this._resolves.push(resolve);
+      }
+    });
+  }
+  aapush(stack, item) {
+    if (this._resolves.length > 0) {
+      const resolve = this._resolves.shift();
+      resolve(item);
+    } else {
+      this._events.push(item);
+    }
   }
 }
 
