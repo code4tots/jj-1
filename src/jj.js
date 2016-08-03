@@ -100,7 +100,7 @@ class Token {
 // Lexer
 
 const keywords = [
-  "package", "import",
+  "package", "import", "as",
   "class", "def", "async", "await",
   "is", "not", "new", "true", "false", "null", "or", "and",
   "for", "if", "else", "while", "break", "continue", "return",

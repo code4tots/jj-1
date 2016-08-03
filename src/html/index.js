@@ -316,25 +316,98 @@ function op__setitem__(stack, owner, key, value) {
 
 
 const moduleCache = Object.create(null);
-const debugInfo = ["??@??@??",".print@<prelude>@4",".assert@<prelude>@8",".assert@<prelude>@9",".assertEqual@<prelude>@14",".assertEqual@<prelude>@15",".@htmldemo.jj@7",".@htmldemo.jj@9",".@htmldemo.jj@10"];
+const debugInfo = ["??@??@??",".print@<prelude>@4",".assert@<prelude>@8",".assert@<prelude>@9",".assertEqual@<prelude>@14",".assertEqual@<prelude>@15",".@canvasdemo.jj@3",".@canvasdemo.jj@4",".@canvasdemo.jj@5",".@canvasdemo.jj@8",".@canvasdemo.jj@9",".@canvasdemo.jj@12",".@canvasdemo.jj@13",".@canvasdemo.jj@14",".@canvasdemo.jj@15",".@canvasdemo.jj@16",".@canvasdemo.jj@19",".@canvasdemo.jj@20",".@canvasdemo.jj@21",".@canvasdemo.jj@23",".@canvasdemo.jj@24",".@canvasdemo.jj@25",".@canvasdemo.jj@26",".@canvasdemo.jj@27",".@canvasdemo.jj@28"];
 const packageTable = Object.create(null);
-packageTable["core.dom"] = "lib\\dom.js";
-packageTable["htmldemo.jj"] = "htmldemo.jj";
+packageTable["simple.canvas"] = "lib\\htmlcanvas.js";
+packageTable["canvasdemo.jj"] = "canvasdemo.jj";
 const uriTable = Object.create(null);
-uriTable["lib\\dom.js"] = function(stack, exports) {
+uriTable["lib\\htmlcanvas.js"] = function(stack, exports) {
+// jj package: simple.canvas
 // jshint esversion: 6
-// jj package: core.dom
 
-exports.aafoo = "hello dom.js";
+class Canvas extends jjObject {
+  constructor(stack) {
+    super();
+    const canvas = document.createElement("canvas");
+    if (!canvas.getContext) {
+      throw new Error("Canvas element not supported!");
+    }
+    this.dom = canvas;
+    this.ctx = canvas.getContext("2d");
+    canvas.setAttribute("width", 300);
+    canvas.setAttribute("height", 300);
+    canvas.style.outline = "thin solid blue";
+    canvas.style.margin = "auto";
+    canvas.style.position = "absolute";
+    canvas.style.top = 0;
+    canvas.style.bottom = 0;
+    canvas.style.right = 0;
+    canvas.style.left = 0;
+  }
+  aagetWidth(stack) {
+    return this.dom.width;
+  }
+  aagetHeight(stack) {
+    return this.dom.height;
+  }
+  aasetWidth(stack, width) {
+    this.dom.width = width;
+  }
+  aasetHeight(stack, height) {
+    this.dom.height = height;
+  }
+  aasetFillStyle(stack, style) {
+    this.ctx.fillStyle = style;
+  }
+  aasetStrokeStyle(stack, style) {
+    this.ctx.strokeStyle = style;
+  }
+  aafillRect(stack, x, y, width, height) {
+    this.ctx.fillRect(x, y, width, height);
+  }
+  aasetFont(stack, font) {
+    this.ctx.font = font;
+  }
+  aafillText(stack, text, x, y, maxWidth) {
+    this.ctx.fillText(text, x, y, maxWidth);
+  }
+  aagetTextWidth(stack, text) {
+    return this.ctx.measureText(text).width;
+  }
+}
 
+function installCanvas(stack, canvas) {
+  document.body.appendChild(canvas.dom);
+}
 
+exports.aaCanvas = Canvas;
+exports.aainstallCanvas = installCanvas;
 
 };
-uriTable["htmldemo.jj"] = function(stack, exports) {
-  const jjdom = importPackage(stack, 'core.dom');
-  (stack.push(6),popStack(stack,jjprint(stack,"Hi")));
-  (stack.push(7),popStack(stack,jjprint(stack,jjdom.aafoo)));
-  (stack.push(8),popStack(stack,jjprint(stack,jjdom)));
+uriTable["canvasdemo.jj"] = function(stack, exports) {
+  const jjlibcanvas = importPackage(stack, 'simple.canvas');
+  (stack.push(6),popStack(stack," create a new canvas element and add it to the document "));
+  let jjcanvas = (stack.push(7),popStack(stack,new (jjlibcanvas.aaCanvas)(stack)));
+  (stack.push(8),popStack(stack,jjlibcanvas.aainstallCanvas(stack,jjcanvas)));
+  (stack.push(9),popStack(stack," setting width "));
+  (stack.push(10),popStack(stack,jjcanvas.aasetWidth(stack,600)));
+  (stack.push(11),popStack(stack," drawing rectangles "));
+  (stack.push(12),popStack(stack,jjcanvas.aasetFillStyle(stack,"rgb(200, 0, 0)")));
+  (stack.push(13),popStack(stack,jjcanvas.aafillRect(stack,10,10,50,50)));
+  (stack.push(14),popStack(stack,jjcanvas.aasetFillStyle(stack,"rgba(0, 0, 200, 0.5)")));
+  (stack.push(15),popStack(stack,jjcanvas.aafillRect(stack,30,30,50,50)));
+  (stack.push(16),popStack(stack," drawing text "));
+  (stack.push(17),popStack(stack,jjcanvas.aasetFont(stack,"48px serif")));
+  (stack.push(18),popStack(stack,jjcanvas.aafillText(stack,"Hello world!",10,150)));
+  {
+    (stack.push(19),popStack(stack,jjcanvas.aasetFillStyle(stack,"rgb(0, 200, 0)")));
+    (stack.push(20),popStack(stack,jjcanvas.aasetFont(stack,"24px serif")));
+    let jjwidthstr = (stack.push(21),popStack(stack,("Width = "+jjstr(stack,jjcanvas.aagetWidth(stack)))));
+    (stack.push(22),popStack(stack,jjcanvas.aafillText(stack,jjwidthstr,10,175)));
+    let jjtextwidth = (stack.push(23),popStack(stack,jjcanvas.aagetTextWidth(stack,jjwidthstr)));
+    (stack.push(24),popStack(stack,jjcanvas.aafillText(stack,(", Height = "+jjstr(stack,jjcanvas.aagetHeight(stack))),(10+jjtextwidth),175)));
+  }
+  exports.aacanvas = jjcanvas;
 };
 // this is a mock stack to run the builtin prelude
 const stack = [];
@@ -357,6 +430,6 @@ const jjassertEqual = function jjassertEqual(stack,jja,jjb,jjmessage)
   }
 };
 tryAndCatch(stack => {
-  importUri(stack, "htmldemo.jj");
+  importUri(stack, "canvasdemo.jj");
 });
 })();

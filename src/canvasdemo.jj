@@ -1,0 +1,32 @@
+import "simple.canvas" as libcanvas;
+
+""" create a new canvas element and add it to the document """;
+let canvas = new (libcanvas.Canvas)();
+libcanvas.installCanvas(canvas);
+
+
+""" setting width
+By default, both width and height are 300px.
+""";
+canvas.setWidth(600);
+
+
+""" drawing rectangles """;
+canvas.setFillStyle("rgb(200, 0, 0)");
+canvas.fillRect(10, 10, 50, 50);
+canvas.setFillStyle("rgba(0, 0, 200, 0.5)");
+canvas.fillRect(30, 30, 50, 50);
+
+
+""" drawing text """;
+canvas.setFont("48px serif");
+canvas.fillText("Hello world!", 10, 150);
+{
+  canvas.setFillStyle("rgb(0, 200, 0)");
+  canvas.setFont("24px serif");
+  let widthstr = "Width = " + str(canvas.getWidth());
+  canvas.fillText(widthstr, 10, 175);
+  let textwidth = canvas.getTextWidth(widthstr);
+  canvas.fillText(
+      ", Height = " + str(canvas.getHeight()), 10 + textwidth, 175);
+}
